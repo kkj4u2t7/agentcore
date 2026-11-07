@@ -1,14 +1,19 @@
 import os
-import sqlite3
-from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from tools.filesystem import get_database_connection
+from tools.database import (
+    create_database,
+    get_database_connection
+)
 
 
 def add_to_index(path):
+    """
+    Add a file or folder to the index.
+    """
+
     path = os.path.abspath(path)
 
     if not os.path.exists(path):
@@ -33,9 +38,7 @@ def add_to_index(path):
         connection.commit()
         connection.close()
 
-        print(f"[INDEX] Added: {path}")
-
-    except sqlite3.Error as error:
+    except Exception as error:
         print(
             f"[WATCHER ERROR] "
             f"Could not add {path}: {error}"
@@ -43,6 +46,10 @@ def add_to_index(path):
 
 
 def remove_from_index(path):
+    """
+    Remove a file or folder from the index.
+    """
+
     path = os.path.abspath(path)
 
     try:
@@ -57,9 +64,7 @@ def remove_from_index(path):
         connection.commit()
         connection.close()
 
-        print(f"[INDEX] Removed: {path}")
-
-    except sqlite3.Error as error:
+    except Exception as error:
         print(
             f"[WATCHER ERROR] "
             f"Could not remove {path}: {error}"
@@ -81,9 +86,7 @@ class MakelessFileHandler(FileSystemEventHandler):
 
 def get_windows_folder(folder_name):
     """
-    Ask Windows for the actual location of a special
-    user folder. This supports folders redirected to
-    OneDrive.
+    Get the actual Windows location of a special user folder.
     """
 
     try:
@@ -98,27 +101,27 @@ def get_windows_folder(folder_name):
             winreg.HKEY_CURRENT_USER,
             registry_key
         ) as key:
-
             value, _ = winreg.QueryValueEx(
                 key,
                 folder_name
             )
 
-        expanded_path = os.path.expandvars(value)
-
-        return Path(expanded_path)
+        return os.path.expandvars(value)
 
     except (FileNotFoundError, OSError):
         return None
 
 
 def get_watch_paths():
-    home = Path.home()
+    """
+    Return user folders that Makeless should watch.
+    """
+
+    home = os.path.expanduser("~")
 
     desktop = get_windows_folder("Desktop")
     documents = get_windows_folder("Personal")
-
-    downloads = home / "Downloads"
+    downloads = os.path.join(home, "Downloads")
 
     paths = [
         downloads,
@@ -131,7 +134,7 @@ def get_watch_paths():
     for path in paths:
         if (
             path
-            and path.exists()
+            and os.path.exists(path)
             and path not in valid_paths
         ):
             valid_paths.append(path)
@@ -140,6 +143,12 @@ def get_watch_paths():
 
 
 def start_watcher():
+    """
+    Start watching common user folders.
+    """
+
+    create_database()
+
     observer = Observer()
     handler = MakelessFileHandler()
 
@@ -151,7 +160,7 @@ def start_watcher():
     for path in watch_paths:
         observer.schedule(
             handler,
-            str(path),
+            path,
             recursive=True
         )
 
@@ -160,19 +169,3 @@ def start_watcher():
     observer.start()
 
     return observer
-
-
-if __name__ == "__main__":
-    observer = start_watcher()
-
-    try:
-        print(
-            "\nWatcher is running. "
-            "Press Ctrl + C to stop."
-        )
-
-        observer.join()
-
-    except KeyboardInterrupt:
-        observer.stop()
-        observer.join()

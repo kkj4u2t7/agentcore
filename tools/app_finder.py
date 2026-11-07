@@ -1,12 +1,17 @@
 import os
 
 
-def get_start_menu_locations():
-    """
-    Return Windows Start Menu locations where application
-    shortcuts are commonly stored.
-    """
+APP_ALIASES = {
+    "vscode": "visual studio code",
+    "vs code": "visual studio code",
+    "code": "visual studio code",
+    "chrome": "google chrome",
+    "brave": "brave",
+    "edge": "microsoft edge"
+}
 
+
+def get_start_menu_locations():
     locations = []
 
     program_data = os.environ.get("PROGRAMDATA")
@@ -40,14 +45,21 @@ def get_start_menu_locations():
 
 def find_apps(query, max_results=10):
     """
-    Search Start Menu shortcuts for installed applications.
+    Search Windows Start Menu shortcuts for applications.
     """
 
     query = query.casefold().strip()
-    results = []
 
     if not query:
-        return results
+        return []
+
+    search_query = APP_ALIASES.get(
+        query,
+        query
+    )
+
+    results = []
+    seen_names = set()
 
     for location in get_start_menu_locations():
 
@@ -61,20 +73,32 @@ def find_apps(query, max_results=10):
                 if not file_name.casefold().endswith(".lnk"):
                     continue
 
-                app_name = os.path.splitext(file_name)[0]
+                app_name = os.path.splitext(
+                    file_name
+                )[0]
 
-                if query in app_name.casefold():
-                    results.append(
-                        {
-                            "name": app_name,
-                            "path": os.path.join(
-                                root,
-                                file_name
-                            )
-                        }
-                    )
+                normalized_name = app_name.casefold()
 
-                    if len(results) >= max_results:
-                        return results
+                if search_query not in normalized_name:
+                    continue
+
+                # Avoid duplicate shortcuts for the same app.
+                if normalized_name in seen_names:
+                    continue
+
+                seen_names.add(normalized_name)
+
+                results.append(
+                    {
+                        "name": app_name,
+                        "path": os.path.join(
+                            root,
+                            file_name
+                        )
+                    }
+                )
+
+                if len(results) >= max_results:
+                    return results
 
     return results

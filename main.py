@@ -16,7 +16,10 @@ def choose_path(query):
     multiple matches are found.
     """
 
-    results = search_files(query, max_results=10)
+    results = search_files(
+        query,
+        max_results=10
+    )
 
     if not results:
         return None
@@ -29,28 +32,15 @@ def choose_path(query):
 
 def choose_app(apps):
     """
-    Choose an application from search results.
+    Choose the best application automatically.
     """
 
-    if len(apps) == 1:
-        return apps[0]
-
-    app_paths = []
-
-    for app in apps:
-        app_paths.append(app["path"])
-
-    selected_path = select_result(app_paths)
-
-    if not selected_path:
+    if not apps:
         return None
 
-    for app in apps:
-        if app["path"] == selected_path:
-            return app
-
-    return None
-
+    # app_finder removes duplicate application names
+    # and returns the best matches first.
+    return apps[0]
 
 def handle_instruction(instruction):
     instruction = instruction.strip()
@@ -62,74 +52,43 @@ def handle_instruction(instruction):
 
         if not query:
             print(
-                "AgentCore: Tell me what you want me to read."
+                "Makeless: Tell me what you want me to read."
             )
             return
 
         print(
-            f"\nAgentCore: Looking for '{query}'..."
+            f"\nMakeless: Looking for '{query}'..."
         )
 
         path = choose_path(query)
 
         if not path:
             print(
-                "AgentCore: I couldn't find that file."
+                "Makeless: I couldn't find that file."
             )
             return
 
         success, content = read_file(path)
 
         if not success:
-            print(f"AgentCore: {content}")
+            print(
+                f"Makeless: {content}"
+            )
             return
 
         print("\n" + "=" * 50)
         print(f"READING: {path}")
         print("=" * 50 + "\n")
-
         print(content)
-
         print("\n" + "=" * 50)
         print("End of file.")
         print("=" * 50)
 
         return
 
-    # Find files and folders.
-    if lower_instruction.startswith("find "):
-        query = instruction[5:].strip()
-
-        if not query:
-            print(
-                "AgentCore: Tell me what you want to find."
-            )
-            return
-
-        print(
-            f"\nAgentCore: Searching for '{query}'...\n"
-        )
-
-        results = search_files(query)
-
-        if not results:
-            print("AgentCore: Nothing found.")
-            return
-
-        print(
-            f"AgentCore: Found {len(results)} result(s)."
-        )
-
-        for index, result in enumerate(
-            results,
-            start=1
-        ):
-            print(f"{index}. {result}")
-
-        return
-
     # Open a browser and search the web.
     if lower_instruction.startswith("open "):
+
         search_separators = [
             " and search for ",
             " and search "
@@ -157,18 +116,18 @@ def handle_instruction(instruction):
 
             if not browser_name:
                 print(
-                    "AgentCore: Tell me which browser to use."
+                    "Makeless: Tell me which browser to use."
                 )
                 return
 
             if not search_query:
                 print(
-                    "AgentCore: Tell me what you want to search for."
+                    "Makeless: Tell me what you want to search for."
                 )
                 return
 
             print(
-                f"\nAgentCore: Searching for "
+                f"\nMakeless: Searching for "
                 f"'{search_query}' in "
                 f"{browser_name.title()}..."
             )
@@ -178,8 +137,89 @@ def handle_instruction(instruction):
                 browser_name
             )
 
-            print(f"AgentCore: {message}")
+            print(f"Makeless: {message}")
             return
+
+    # Find files and folders.
+    if lower_instruction.startswith("find "):
+        query = instruction[5:].strip()
+
+        if not query:
+            print(
+                "Makeless: Tell me what you want to find."
+            )
+            return
+
+        print(
+            f"\nMakeless: Searching for '{query}'...\n"
+        )
+
+        results = search_files(query)
+
+        if not results:
+            print(
+                "Makeless: Nothing found."
+            )
+            return
+
+        print(
+            f"Makeless: Found {len(results)} result(s)."
+        )
+
+        for index, result in enumerate(
+            results,
+            start=1
+        ):
+            print(
+                f"{index}. {result}"
+            )
+
+        return
+
+    # Open a browser and search the web.
+    separator = " and search for "
+
+    if (
+        lower_instruction.startswith("open ")
+        and separator in lower_instruction
+    ):
+        split_index = lower_instruction.index(
+            separator
+        )
+
+        browser_name = instruction[
+            5:split_index
+        ].strip()
+
+        search_query = instruction[
+            split_index + len(separator):
+        ].strip()
+
+        if not browser_name:
+            print(
+                "Makeless: Tell me which browser to use."
+            )
+            return
+
+        if not search_query:
+            print(
+                "Makeless: Tell me what you want to search for."
+            )
+            return
+
+        print(
+            f"\nMakeless: Searching for "
+            f"'{search_query}' in "
+            f"{browser_name.title()}..."
+        )
+
+        success, message = search_in_browser(
+            search_query,
+            browser_name
+        )
+
+        print(f"Makeless: {message}")
+        return
 
     # Open something in VS Code.
     if (
@@ -189,22 +229,26 @@ def handle_instruction(instruction):
             or lower_instruction.endswith(" in vscode")
         )
     ):
-        if lower_instruction.endswith(" in vs code"):
+        if lower_instruction.endswith(
+            " in vs code"
+        ):
             query = instruction[5:-11].strip()
         else:
             query = instruction[5:-10].strip()
 
         if not query:
             print(
-                "AgentCore: Tell me what you want to open."
+                "Makeless: Tell me what you want to open."
             )
             return
 
         print(
-            f"\nAgentCore: Looking for '{query}'..."
+            f"\nMakeless: Looking for '{query}'..."
         )
 
-        system_location = get_system_location(query)
+        system_location = get_system_location(
+            query
+        )
 
         if system_location:
             path = str(system_location)
@@ -213,7 +257,7 @@ def handle_instruction(instruction):
 
         if not path:
             print(
-                "AgentCore: I couldn't find that."
+                "Makeless: I couldn't find that."
             )
             return
 
@@ -222,69 +266,71 @@ def handle_instruction(instruction):
             app="vscode"
         )
 
-        print(f"AgentCore: {message}")
+        print(f"Makeless: {message}")
         return
 
-    # Open something normally.
+    # Open an app, file, or folder.
     if lower_instruction.startswith("open "):
         query = instruction[5:].strip()
 
         if not query:
             print(
-                "AgentCore: Tell me what you want to open."
+                "Makeless: Tell me what you want to open."
             )
             return
 
         print(
-            f"\nAgentCore: Looking for '{query}'..."
+            f"\nMakeless: Looking for '{query}'..."
         )
 
-        # 1. Check known Windows locations.
-        system_location = get_system_location(query)
+        # 1. Check installed applications FIRST.
+        apps = find_apps(query)
+
+        if apps:
+            app = choose_app(apps)
+
+            if app:
+                success, message = launch_app(
+                    app["path"]
+                )
+
+                if success:
+                    print(
+                        f"Makeless: Launched "
+                        f"{app['name']}"
+                    )
+                else:
+                    print(
+                        f"Makeless: {message}"
+                    )
+
+                return
+
+        # 2. Check known system locations.
+        system_location = get_system_location(
+            query
+        )
 
         if system_location:
             path = str(system_location)
 
         else:
-            # 2. Check installed applications.
-            apps = find_apps(query)
-
-            if apps:
-                app = choose_app(apps)
-
-                if app:
-                    success, message = launch_app(
-                        app["path"]
-                    )
-
-                    if success:
-                        print(
-                            f"AgentCore: Launched "
-                            f"{app['name']}"
-                        )
-                    else:
-                        print(
-                            f"AgentCore: {message}"
-                        )
-
-                    return
-
-            # 3. Search indexed files.
+            # 3. Search indexed files and folders.
             path = choose_path(query)
 
         if not path:
             print(
-                "AgentCore: I couldn't find that."
+                "Makeless: I couldn't find that."
             )
             return
 
         success, message = open_item(path)
 
-        print(f"AgentCore: {message}")
+        print(f"Makeless: {message}")
         return
 
     print(
-        "AgentCore: I don't know how to perform "
+        "Makeless: I don't know how to perform "
         "that task yet."
     )
 
@@ -295,11 +341,16 @@ def main():
     print("================================")
     print("Starting local computer operator...")
 
-    # Automatically create and build the file index
-    # when Makeless runs for the first time.
-    ensure_index()
+    try:
+        ensure_index()
 
-    observer = start_watcher()
+        observer = start_watcher()
+
+    except Exception as error:
+        print(
+            f"\nMakeless: Startup error: {error}"
+        )
+        return
 
     print("\nReady.")
     print("Tell me what you want to do.")
@@ -307,22 +358,44 @@ def main():
 
     try:
         while True:
-            instruction = input("You: ")
+            try:
+                instruction = input("You: ")
 
-            if instruction.strip().casefold() == "exit":
+                if (
+                    instruction.strip().casefold()
+                    == "exit"
+                ):
+                    print(
+                        "\nMakeless: Shutting down..."
+                    )
+                    break
+
+                if not instruction.strip():
+                    continue
+
+                # Run one command safely.
+                # If it fails, Makeless stays alive.
+                try:
+                    handle_instruction(instruction)
+
+                except Exception as error:
+                    print(
+                        "\nMakeless: Something went wrong "
+                        f"while handling that command: {error}"
+                    )
+                    print(
+                        "Makeless: Try another command."
+                    )
+
+            except EOFError:
                 print(
-                    "\nAgentCore: Shutting down..."
+                    "\nMakeless: Input closed."
                 )
                 break
 
-            if not instruction.strip():
-                continue
-
-            handle_instruction(instruction)
-
     except KeyboardInterrupt:
         print(
-            "\n\nAgentCore: Interrupted. "
+            "\n\nMakeless: Interrupted. "
             "Shutting down..."
         )
 
@@ -330,7 +403,7 @@ def main():
         observer.stop()
         observer.join()
 
-        print("AgentCore: Goodbye!")
+        print("Makeless: Goodbye!")
 
 
 if __name__ == "__main__":

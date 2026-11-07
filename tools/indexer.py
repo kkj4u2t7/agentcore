@@ -1,14 +1,18 @@
 import os
-import sqlite3
 import string
-
+import sqlite3
 from tools.filesystem import (
     DATABASE_PATH,
-    APP_DATA_DIR
+    get_database_connection,
+    ensure_database_directory
 )
 
 
 def get_available_drives():
+    """
+    Return all available Windows drives.
+    """
+
     drives = []
 
     for letter in string.ascii_uppercase:
@@ -21,12 +25,13 @@ def get_available_drives():
 
 
 def create_database():
-    APP_DATA_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    """
+    Create the file index database and tables.
+    """
 
-    connection = sqlite3.connect(DATABASE_PATH)
+    ensure_database_directory()
+
+    connection = get_database_connection()
     cursor = connection.cursor()
 
     cursor.execute(
@@ -50,33 +55,12 @@ def create_database():
     connection.close()
 
 
-def is_index_ready():
-    if not DATABASE_PATH.exists():
-        return False
-
-    try:
-        connection = sqlite3.connect(DATABASE_PATH)
-        cursor = connection.cursor()
-
-        cursor.execute(
-            """
-            SELECT COUNT(*)
-            FROM file_index
-            """
-        )
-
-        count = cursor.fetchone()[0]
-
-        connection.close()
-
-        return count > 0
-
-    except sqlite3.Error:
-        return False
-
-
 def index_drive(drive):
-    connection = sqlite3.connect(DATABASE_PATH)
+    """
+    Index files and folders from a drive.
+    """
+
+    connection = get_database_connection()
     cursor = connection.cursor()
 
     indexed_count = 0
@@ -156,8 +140,9 @@ def index_drive(drive):
     except PermissionError:
         pass
 
-    connection.commit()
-    connection.close()
+    finally:
+        connection.commit()
+        connection.close()
 
     print(
         f"Finished {drive}: "
@@ -166,6 +151,10 @@ def index_drive(drive):
 
 
 def build_index():
+    """
+    Build the complete file index.
+    """
+
     print("\nMakeless File Indexer")
     print("----------------------")
 
@@ -177,20 +166,19 @@ def build_index():
         index_drive(drive)
 
     print("\nIndexing complete.")
+    print(f"Database: {DATABASE_PATH}")
 
 
 def ensure_index():
-    create_database()
+    """
+    Create and build the index if it does not exist.
+    """
 
-    if is_index_ready():
+    if not DATABASE_PATH.exists():
+        build_index()
         return
 
-    print(
-        "\nMakeless is setting up your "
-        "local file index for the first time..."
-    )
-
-    build_index()
+    create_database()
 
 
 if __name__ == "__main__":

@@ -3,26 +3,45 @@ import sqlite3
 from pathlib import Path
 
 
-APP_DATA_DIR = Path(
-    os.environ.get("LOCALAPPDATA", Path.home())
-) / "Makeless"
+APP_DATA_DIRECTORY = Path.home() / ".makeless"
+DATABASE_PATH = APP_DATA_DIRECTORY / "agentcore.db"
 
-DATABASE_PATH = APP_DATA_DIR / "makeless.db"
+
+def ensure_database_directory():
+    """
+    Create the Makeless data directory if it does not exist.
+    """
+
+    APP_DATA_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
 
 def get_database_connection():
-    APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    """
+    Return a connection to the Makeless database.
+    """
+
+    ensure_database_directory()
 
     return sqlite3.connect(DATABASE_PATH)
 
 
 def search_files(query, max_results=20):
-    query = query.casefold()
+    """
+    Search the local file index.
+    """
 
-    connection = get_database_connection()
-    cursor = connection.cursor()
+    query = query.casefold().strip()
+
+    if not query:
+        return []
 
     try:
+        connection = get_database_connection()
+        cursor = connection.cursor()
+
         cursor.execute(
             """
             SELECT path, name, item_type
@@ -34,12 +53,10 @@ def search_files(query, max_results=20):
         )
 
         rows = cursor.fetchall()
-
-    except sqlite3.OperationalError:
-        rows = []
-
-    finally:
         connection.close()
+
+    except sqlite3.Error:
+        return []
 
     results = []
 
@@ -70,7 +87,14 @@ def search_files(query, max_results=20):
 
 
 def find_best_match(query):
-    results = search_files(query, max_results=100)
+    """
+    Find the best matching file or folder.
+    """
+
+    results = search_files(
+        query,
+        max_results=100
+    )
 
     if not results:
         return None
