@@ -5,13 +5,7 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATABASE_PATH = PROJECT_ROOT / "data" / "agentcore.db"
-
-
-def get_database_connection():
-    return sqlite3.connect(DATABASE_PATH)
+from tools.filesystem import get_database_connection
 
 
 def add_to_index(path):
@@ -42,7 +36,10 @@ def add_to_index(path):
         print(f"[INDEX] Added: {path}")
 
     except sqlite3.Error as error:
-        print(f"[WATCHER ERROR] Could not add {path}: {error}")
+        print(
+            f"[WATCHER ERROR] "
+            f"Could not add {path}: {error}"
+        )
 
 
 def remove_from_index(path):
@@ -63,10 +60,13 @@ def remove_from_index(path):
         print(f"[INDEX] Removed: {path}")
 
     except sqlite3.Error as error:
-        print(f"[WATCHER ERROR] Could not remove {path}: {error}")
+        print(
+            f"[WATCHER ERROR] "
+            f"Could not remove {path}: {error}"
+        )
 
 
-class AgentCoreFileHandler(FileSystemEventHandler):
+class MakelessFileHandler(FileSystemEventHandler):
 
     def on_created(self, event):
         add_to_index(event.src_path)
@@ -81,8 +81,9 @@ class AgentCoreFileHandler(FileSystemEventHandler):
 
 def get_windows_folder(folder_name):
     """
-    Ask Windows for the actual location of a special user folder.
-    This supports folders redirected to OneDrive.
+    Ask Windows for the actual location of a special
+    user folder. This supports folders redirected to
+    OneDrive.
     """
 
     try:
@@ -97,6 +98,7 @@ def get_windows_folder(folder_name):
             winreg.HKEY_CURRENT_USER,
             registry_key
         ) as key:
+
             value, _ = winreg.QueryValueEx(
                 key,
                 folder_name
@@ -113,12 +115,9 @@ def get_windows_folder(folder_name):
 def get_watch_paths():
     home = Path.home()
 
-    # Ask Windows for these locations instead of guessing.
     desktop = get_windows_folder("Desktop")
     documents = get_windows_folder("Personal")
 
-    # Downloads is usually stored under the user's home folder.
-    # We'll make this dynamically discoverable in the next improvement.
     downloads = home / "Downloads"
 
     paths = [
@@ -142,11 +141,11 @@ def get_watch_paths():
 
 def start_watcher():
     observer = Observer()
-    handler = AgentCoreFileHandler()
+    handler = MakelessFileHandler()
 
     watch_paths = get_watch_paths()
 
-    print("\nAgentCore File Watcher")
+    print("\nMakeless File Watcher")
     print("----------------------")
 
     for path in watch_paths:
@@ -167,12 +166,13 @@ if __name__ == "__main__":
     observer = start_watcher()
 
     try:
-        print("\nWatcher is running. Press Ctrl + C to stop.")
+        print(
+            "\nWatcher is running. "
+            "Press Ctrl + C to stop."
+        )
 
-        while True:
-            pass
+        observer.join()
 
     except KeyboardInterrupt:
         observer.stop()
-
-    observer.join()
+        observer.join()

@@ -1,11 +1,11 @@
 import os
 import sqlite3
 import string
-from pathlib import Path
 
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATABASE_PATH = PROJECT_ROOT / "data" / "agentcore.db"
+from tools.filesystem import (
+    DATABASE_PATH,
+    APP_DATA_DIR
+)
 
 
 def get_available_drives():
@@ -21,26 +21,58 @@ def get_available_drives():
 
 
 def create_database():
-    DATABASE_PATH.parent.mkdir(exist_ok=True)
+    APP_DATA_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     connection = sqlite3.connect(DATABASE_PATH)
     cursor = connection.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS file_index (
             path TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             item_type TEXT NOT NULL
         )
-    """)
+        """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_file_name
         ON file_index(name)
-    """)
+        """
+    )
 
     connection.commit()
     connection.close()
+
+
+def is_index_ready():
+    if not DATABASE_PATH.exists():
+        return False
+
+    try:
+        connection = sqlite3.connect(DATABASE_PATH)
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM file_index
+            """
+        )
+
+        count = cursor.fetchone()[0]
+
+        connection.close()
+
+        return count > 0
+
+    except sqlite3.Error:
+        return False
 
 
 def index_drive(drive):
@@ -57,7 +89,6 @@ def index_drive(drive):
             topdown=True,
             followlinks=False
         ):
-            # Don't follow Windows links.
             directories[:] = [
                 directory
                 for directory in directories
@@ -67,7 +98,10 @@ def index_drive(drive):
             ]
 
             for directory in directories:
-                full_path = os.path.join(root, directory)
+                full_path = os.path.join(
+                    root,
+                    directory
+                )
 
                 try:
                     cursor.execute(
@@ -76,7 +110,11 @@ def index_drive(drive):
                         (path, name, item_type)
                         VALUES (?, ?, ?)
                         """,
-                        (full_path, directory, "folder")
+                        (
+                            full_path,
+                            directory,
+                            "folder"
+                        )
                     )
 
                     indexed_count += 1
@@ -84,8 +122,11 @@ def index_drive(drive):
                 except sqlite3.Error:
                     continue
 
-            for file in files:
-                full_path = os.path.join(root, file)
+            for file_name in files:
+                full_path = os.path.join(
+                    root,
+                    file_name
+                )
 
                 try:
                     cursor.execute(
@@ -94,7 +135,11 @@ def index_drive(drive):
                         (path, name, item_type)
                         VALUES (?, ?, ?)
                         """,
-                        (full_path, file, "file")
+                        (
+                            full_path,
+                            file_name,
+                            "file"
+                        )
                     )
 
                     indexed_count += 1
@@ -102,8 +147,10 @@ def index_drive(drive):
                 except sqlite3.Error:
                     continue
 
-            # Save progress periodically.
-            if indexed_count % 1000 == 0 and indexed_count > 0:
+            if (
+                indexed_count > 0
+                and indexed_count % 1000 == 0
+            ):
                 connection.commit()
 
     except PermissionError:
@@ -112,11 +159,14 @@ def index_drive(drive):
     connection.commit()
     connection.close()
 
-    print(f"Finished {drive}: {indexed_count} items indexed.")
+    print(
+        f"Finished {drive}: "
+        f"{indexed_count} items indexed."
+    )
 
 
 def build_index():
-    print("\nAgentCore File Indexer")
+    print("\nMakeless File Indexer")
     print("----------------------")
 
     create_database()
@@ -127,6 +177,20 @@ def build_index():
         index_drive(drive)
 
     print("\nIndexing complete.")
+
+
+def ensure_index():
+    create_database()
+
+    if is_index_ready():
+        return
+
+    print(
+        "\nMakeless is setting up your "
+        "local file index for the first time..."
+    )
+
+    build_index()
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from tools.open_router import open_item
 from tools.app_finder import find_apps
 from tools.app_launcher import launch_app
 from tools.launcher import search_in_browser
+from tools.indexer import ensure_index
 
 
 def choose_path(query):
@@ -60,15 +61,21 @@ def handle_instruction(instruction):
         query = instruction[5:].strip()
 
         if not query:
-            print("AgentCore: Tell me what you want me to read.")
+            print(
+                "AgentCore: Tell me what you want me to read."
+            )
             return
 
-        print(f"\nAgentCore: Looking for '{query}'...")
+        print(
+            f"\nAgentCore: Looking for '{query}'..."
+        )
 
         path = choose_path(query)
 
         if not path:
-            print("AgentCore: I couldn't find that file.")
+            print(
+                "AgentCore: I couldn't find that file."
+            )
             return
 
         success, content = read_file(path)
@@ -94,10 +101,14 @@ def handle_instruction(instruction):
         query = instruction[5:].strip()
 
         if not query:
-            print("AgentCore: Tell me what you want to find.")
+            print(
+                "AgentCore: Tell me what you want to find."
+            )
             return
 
-        print(f"\nAgentCore: Searching for '{query}'...\n")
+        print(
+            f"\nAgentCore: Searching for '{query}'...\n"
+        )
 
         results = search_files(query)
 
@@ -105,47 +116,72 @@ def handle_instruction(instruction):
             print("AgentCore: Nothing found.")
             return
 
-        print(f"AgentCore: Found {len(results)} result(s).")
+        print(
+            f"AgentCore: Found {len(results)} result(s)."
+        )
 
-        for index, result in enumerate(results, start=1):
+        for index, result in enumerate(
+            results,
+            start=1
+        ):
             print(f"{index}. {result}")
 
         return
 
     # Open a browser and search the web.
-    separator = " and search for "
+    if lower_instruction.startswith("open "):
+        search_separators = [
+            " and search for ",
+            " and search "
+        ]
 
-    if (
-        lower_instruction.startswith("open ")
-        and separator in lower_instruction
-    ):
-        split_index = lower_instruction.index(separator)
+        separator_found = None
 
-        browser_name = instruction[5:split_index].strip()
-        search_query = instruction[split_index + len(separator):].strip()
+        for separator in search_separators:
+            if separator in lower_instruction:
+                separator_found = separator
+                break
 
-        if not browser_name:
-            print("AgentCore: Tell me which browser to use.")
+        if separator_found:
+            split_index = lower_instruction.index(
+                separator_found
+            )
+
+            browser_name = instruction[
+                5:split_index
+            ].strip()
+
+            search_query = instruction[
+                split_index + len(separator_found):
+            ].strip()
+
+            if not browser_name:
+                print(
+                    "AgentCore: Tell me which browser to use."
+                )
+                return
+
+            if not search_query:
+                print(
+                    "AgentCore: Tell me what you want to search for."
+                )
+                return
+
+            print(
+                f"\nAgentCore: Searching for "
+                f"'{search_query}' in "
+                f"{browser_name.title()}..."
+            )
+
+            success, message = search_in_browser(
+                search_query,
+                browser_name
+            )
+
+            print(f"AgentCore: {message}")
             return
 
-        if not search_query:
-            print("AgentCore: Tell me what you want to search for.")
-            return
-
-        print(
-            f"\nAgentCore: Searching for "
-            f"'{search_query}' in {browser_name.title()}..."
-        )
-
-        success, message = search_in_browser(
-            search_query,
-            browser_name
-        )
-
-        print(f"AgentCore: {message}")
-        return
-
-    # Open something in a specific application.
+    # Open something in VS Code.
     if (
         lower_instruction.startswith("open ")
         and (
@@ -159,10 +195,14 @@ def handle_instruction(instruction):
             query = instruction[5:-10].strip()
 
         if not query:
-            print("AgentCore: Tell me what you want to open.")
+            print(
+                "AgentCore: Tell me what you want to open."
+            )
             return
 
-        print(f"\nAgentCore: Looking for '{query}'...")
+        print(
+            f"\nAgentCore: Looking for '{query}'..."
+        )
 
         system_location = get_system_location(query)
 
@@ -172,7 +212,9 @@ def handle_instruction(instruction):
             path = choose_path(query)
 
         if not path:
-            print("AgentCore: I couldn't find that.")
+            print(
+                "AgentCore: I couldn't find that."
+            )
             return
 
         success, message = open_item(
@@ -188,18 +230,23 @@ def handle_instruction(instruction):
         query = instruction[5:].strip()
 
         if not query:
-            print("AgentCore: Tell me what you want to open.")
+            print(
+                "AgentCore: Tell me what you want to open."
+            )
             return
 
-        print(f"\nAgentCore: Looking for '{query}'...")
+        print(
+            f"\nAgentCore: Looking for '{query}'..."
+        )
 
-        # 1. Check known locations first.
+        # 1. Check known Windows locations.
         system_location = get_system_location(query)
 
         if system_location:
             path = str(system_location)
+
         else:
-            # 2. Check installed apps.
+            # 2. Check installed applications.
             apps = find_apps(query)
 
             if apps:
@@ -212,18 +259,23 @@ def handle_instruction(instruction):
 
                     if success:
                         print(
-                            f"AgentCore: Launched {app['name']}"
+                            f"AgentCore: Launched "
+                            f"{app['name']}"
                         )
                     else:
-                        print(f"AgentCore: {message}")
+                        print(
+                            f"AgentCore: {message}"
+                        )
 
                     return
 
-            # 3. Otherwise search files.
+            # 3. Search indexed files.
             path = choose_path(query)
 
         if not path:
-            print("AgentCore: I couldn't find that.")
+            print(
+                "AgentCore: I couldn't find that."
+            )
             return
 
         success, message = open_item(path)
@@ -231,14 +283,21 @@ def handle_instruction(instruction):
         print(f"AgentCore: {message}")
         return
 
-    print("AgentCore: I don't know how to perform that task yet.")
+    print(
+        "AgentCore: I don't know how to perform "
+        "that task yet."
+    )
 
 
 def main():
     print("================================")
-    print("       AgentCore Local")
+    print("          Makeless")
     print("================================")
     print("Starting local computer operator...")
+
+    # Automatically create and build the file index
+    # when Makeless runs for the first time.
+    ensure_index()
 
     observer = start_watcher()
 
@@ -251,7 +310,9 @@ def main():
             instruction = input("You: ")
 
             if instruction.strip().casefold() == "exit":
-                print("\nAgentCore: Shutting down...")
+                print(
+                    "\nAgentCore: Shutting down..."
+                )
                 break
 
             if not instruction.strip():
@@ -260,11 +321,15 @@ def main():
             handle_instruction(instruction)
 
     except KeyboardInterrupt:
-        print("\n\nAgentCore: Interrupted. Shutting down...")
+        print(
+            "\n\nAgentCore: Interrupted. "
+            "Shutting down..."
+        )
 
     finally:
         observer.stop()
         observer.join()
+
         print("AgentCore: Goodbye!")
 
 

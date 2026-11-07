@@ -3,28 +3,43 @@ import sqlite3
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATABASE_PATH = PROJECT_ROOT / "data" / "agentcore.db"
+APP_DATA_DIR = Path(
+    os.environ.get("LOCALAPPDATA", Path.home())
+) / "Makeless"
+
+DATABASE_PATH = APP_DATA_DIR / "makeless.db"
+
+
+def get_database_connection():
+    APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    return sqlite3.connect(DATABASE_PATH)
 
 
 def search_files(query, max_results=20):
     query = query.casefold()
 
-    connection = sqlite3.connect(DATABASE_PATH)
+    connection = get_database_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        SELECT path, name, item_type
-        FROM file_index
-        WHERE LOWER(name) LIKE ?
-        LIMIT ?
-        """,
-        (f"%{query}%", 200)
-    )
+    try:
+        cursor.execute(
+            """
+            SELECT path, name, item_type
+            FROM file_index
+            WHERE LOWER(name) LIKE ?
+            LIMIT ?
+            """,
+            (f"%{query}%", 200)
+        )
 
-    rows = cursor.fetchall()
-    connection.close()
+        rows = cursor.fetchall()
+
+    except sqlite3.OperationalError:
+        rows = []
+
+    finally:
+        connection.close()
 
     results = []
 
@@ -37,14 +52,12 @@ def search_files(query, max_results=20):
     for path, name, item_type in rows:
         normalized_path = path.casefold()
 
-        # Ignore locations that are almost never useful to a user.
         if any(
             ignored in normalized_path
             for ignored in ignored_paths
         ):
             continue
 
-        # Ignore files that no longer exist.
         if not os.path.exists(path):
             continue
 
@@ -63,7 +76,6 @@ def find_best_match(query):
         return None
 
     query = query.casefold()
-    project_root = str(PROJECT_ROOT).casefold()
 
     def score_result(path):
         normalized_path = path.casefold()
@@ -71,25 +83,17 @@ def find_best_match(query):
 
         score = 0
 
-        # Exact filename match.
         if name == query:
             score += 1000
 
-        # Filename starts with the query.
         elif name.startswith(query):
             score += 500
 
-        # The AgentCore project gets a strong preference.
-        if normalized_path.startswith(project_root):
-            score += 2000
-
-        # Prefer normal user files.
         user_home = str(Path.home()).casefold()
 
         if normalized_path.startswith(user_home):
             score += 200
 
-        # Penalize shortcuts.
         if name.endswith(".lnk"):
             score -= 500
 

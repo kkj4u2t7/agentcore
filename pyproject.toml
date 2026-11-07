@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "makeless"
-version = "0.1.0"
+version = "0.1.1"
 description = "A local-first computer operator for Windows."
 readme = "README.md"
 requires-python = ">=3.9"
